@@ -38,7 +38,7 @@ fn handle_client(stream: TcpStream) {
     }
 }
 
-fn get_operation(path: &str, stream: &mut TcpStream) {
+fn get_operation_old(path: &str, stream: &mut TcpStream) {
     let path = PathBuf::from(format!("/Users/matsuzakirei/src/github.com/ReiMatsuzaki/web-rust/www{}", path));
     let mut file = match File::open(&path) {
         Ok(file) => file,
@@ -54,5 +54,23 @@ fn get_operation(path: &str, stream: &mut TcpStream) {
     writeln!(stream).unwrap();
 
     copy(&mut file, stream).unwrap();
+}
 
+fn get_operation(path: &str, stream: &mut TcpStream) {
+    let path = PathBuf::from(format!("/Users/matsuzakirei/src/github.com/ReiMatsuzaki/web-rust/www{}", path));
+    let mut open_file = File::open(&path);
+    match open_file {
+        Ok(file) => {
+            let len = file.metadata().map(|m| m.len()).unwrap_or(0);
+            writeln!(stream, "HTTP/1.1 200 OK").unwrap();
+            writeln!(stream, "Content-Type: text/html; charset=UTF-8").unwrap();
+            writeln!(stream, "Content-Length: {}", len).unwrap();
+            writeln!(stream).unwrap();
+            let mut file2 = file;
+            copy(&mut file2, stream).unwrap();
+        },
+        Err(_) => {
+            writeln!(stream, "HTTP/1.1 501 ERR").unwrap();
+        },
+    };
 }
