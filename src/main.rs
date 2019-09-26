@@ -1,6 +1,6 @@
 use std::net::{TcpListener, TcpStream};
 use std::thread;
-use std::io::{BufRead, BufReader, Error, copy};
+use std::io::{BufRead, BufReader, copy, Write};
 use std::path::PathBuf;
 use std::fs::File;
 
@@ -39,11 +39,11 @@ fn handle_client(stream: TcpStream) {
 }
 
 fn get_operation(path: &str, stream: &mut TcpStream) {
-    let path = PathBuf::from(format!("./www{}", path));
+    let path = PathBuf::from(format!("/Users/matsuzakirei/src/github.com/ReiMatsuzaki/web-rust/www{}", path));
     let mut file = match File::open(&path) {
         Ok(file) => file,
-        Err(why) => {
-            panic!("failed to open {}: {}", path.display(), Error::description(&why))
+        Err(_) => {
+            panic!("failed to open {}", path.display());
         },
     };
     let len = file.metadata().map(|m| m.len()).unwrap_or(0);
