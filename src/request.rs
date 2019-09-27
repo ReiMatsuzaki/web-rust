@@ -3,7 +3,7 @@ use std::net::TcpStream;
 use std::io::{BufReader, BufRead};
 
 pub struct HttpRequest {
-    method: String,
+    pub method: String,
     pub path: String,
     version: String,
     header: HashMap<String, String>,

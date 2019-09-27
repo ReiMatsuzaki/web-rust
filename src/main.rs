@@ -25,7 +25,11 @@ fn main() {
 fn handle_client(stream: TcpStream) {
     let (result, mut stream) = request::from_stream(stream);
     let res = match result {
-        Ok(req) => get_operation(&req.path),
+        Ok(req) => if req.method == "GET" {
+            get_operation(&req.path)
+        } else {
+            response::not_implemented()
+        }
         Err(_) => response::internal_server_error()
     };
     res.write_stream(&mut stream);
@@ -37,8 +41,8 @@ fn get_operation(path: &String) -> HttpResponse {
     match open_file {
         Ok(file) => {
             let mut body = String::new();
-            let mut file2 = file; // TODO: this code seems illegal
-            match file2.read_to_string(&mut body) {
+            let mut file = file;
+            match file.read_to_string(&mut body) {
                 Ok(_) => response::ok(body),
                 Err(_) => response::internal_server_error(),
             }
