@@ -5,9 +5,8 @@ use std::io::{BufRead, BufReader, Read};
 use std::net::{TcpListener, TcpStream};
 use std::path::PathBuf;
 use std::thread;
-use web_rust::response;
-use web_rust::response::HttpResponse;
-
+use web_rust::response::{self, HttpResponse};
+use web_rust::request::{self, HttpRequest};
 
 fn main() {
     let listener = TcpListener::bind("127.0.0.1:8080").unwrap();
@@ -21,7 +20,15 @@ fn main() {
             Err(_) => { panic!("connection failed")}
         }
     }
-    println!("Hello, world!");
+}
+
+fn handle_client2(stream: TcpStream) {
+    let (result, mut stream) = request::from_stream(stream);
+    let res = match result {
+        Ok(req) => get_operation(&req.path),
+        Err(_) => response::internal_server_error()
+    };
+    res.write_stream(&mut stream);
 }
 
 fn handle_client(tcp_stream: TcpStream) {
@@ -37,7 +44,7 @@ fn handle_client(tcp_stream: TcpStream) {
     let path = params.next();
     let res = match (method, path) {
         (Some("GET"), Some(path)) => {
-            get_operation(path)
+            get_operation(&path.to_string())
         }
         _ => response::not_implemented()
     };
@@ -46,7 +53,7 @@ fn handle_client(tcp_stream: TcpStream) {
     res.write_stream(&mut tcp_stream);
 }
 
-fn get_operation(path: &str) -> HttpResponse {
+fn get_operation(path: &String) -> HttpResponse {
     let path = PathBuf::from(format!("/Users/matsuzakirei/src/github.com/ReiMatsuzaki/web-rust/www{}", path));
     let open_file = File::open(&path);
     match open_file {
