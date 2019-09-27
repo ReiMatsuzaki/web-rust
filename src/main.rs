@@ -25,12 +25,12 @@ fn main() {
 fn handle_client(stream: TcpStream) {
     let (result, mut stream) = request::from_stream(stream);
     let res = match result {
-        Ok(req) => if req.method == "GET" {
-            get_operation(&req.path)
-        } else {
-            response::not_implemented()
+        Err(_) => response::internal_server_error(),
+        Ok(req) => match &*req.method {
+            "GET" => get_operation(&req.path),
+            "HEAD" => head_operation(&req.path),
+            _ => response::not_implemented()
         }
-        Err(_) => response::internal_server_error()
     };
     res.write_stream(&mut stream);
 }
@@ -43,7 +43,7 @@ fn get_operation(path: &String) -> HttpResponse {
             let mut body = String::new();
             let mut file = file;
             match file.read_to_string(&mut body) {
-                Ok(_) => response::ok(body),
+                Ok(_) => response::ok(body, true),
                 Err(_) => response::internal_server_error(),
             }
         },
@@ -53,7 +53,23 @@ fn get_operation(path: &String) -> HttpResponse {
     }
 }
 
-
+fn head_operation(path: &String) -> HttpResponse {
+    let path = PathBuf::from(format!("/Users/matsuzakirei/src/github.com/ReiMatsuzaki/web-rust/www{}", path));
+    let open_file = File::open(&path);
+    match open_file {
+        Ok(file) => {
+            let mut body = String::new();
+            let mut file = file;
+            match file.read_to_string(&mut body) {
+                Ok(_) => response::ok(body, false),
+                Err(_) => response::internal_server_error(),
+            }
+        },
+        Err(_) => {
+            response::not_found()
+        },
+    }
+}
 
 
 

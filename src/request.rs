@@ -7,6 +7,7 @@ pub struct HttpRequest {
     pub path: String,
     version: String,
     header: HashMap<String, String>,
+    body: String,
 }
 impl HttpRequest {
     pub fn to_string(&self) -> String {
@@ -15,6 +16,8 @@ impl HttpRequest {
         for (k, v) in &self.header {
             buf = format!("{}{}: {}\n", buf, k, v);
         }
+        buf = format!("{}\n", buf);
+        buf = format!("{}{}\n", buf, self.body);
         buf
     }
 }
@@ -56,14 +59,29 @@ pub fn from_stream(tcp_stream: TcpStream) -> (Result<HttpRequest, Box<dyn std::e
                 panic!("failed to get key and value. line: {}", line)
             }
         }
-    };
+    }
+
+    let mut done = false;
+    let mut body = String::new();
+    while !done {
+        let mut line = String::new();
+        if let Err(err) = reader.read_line(&mut line) {
+            panic!("error during reading stream: {}", err);
+        };
+        if !line.contains(":") {
+            done = true;
+        } else {
+            body = format!("{}{}", body, line);
+        }
+    }
 
     // return
     let req = HttpRequest {
         method,
         path,
         version: "1.1".to_string(),
-        header
+        header,
+        body
     };
     let tcp_stream = reader.into_inner();
     (Ok(req), tcp_stream)

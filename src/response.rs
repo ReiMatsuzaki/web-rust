@@ -31,13 +31,15 @@ fn empty_response(code: i32, description: &str) -> HttpResponse {
         body
     }
 }
-pub fn ok(body: String) -> HttpResponse {
+pub fn ok(body: String, contain_body: bool) -> HttpResponse {
 
     let len = format!("{}", body.len().to_string());
 
     let mut key_values = HashMap::new();
     key_values.insert("Content-Type".to_string(), "text/html; charset=UTF-8".to_string());
     key_values.insert("Content-Length".to_string(), len);
+
+    let body = if contain_body { body } else { String::from("") };
 
     return HttpResponse{
         version: "1.1".to_string(),
