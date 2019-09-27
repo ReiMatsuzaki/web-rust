@@ -1,12 +1,12 @@
 extern crate web_rust;
 
 use std::fs::File;
-use std::io::{BufRead, BufReader, Read};
+use std::io::Read;
 use std::net::{TcpListener, TcpStream};
 use std::path::PathBuf;
 use std::thread;
 use web_rust::response::{self, HttpResponse};
-use web_rust::request::{self, HttpRequest};
+use web_rust::request;
 
 fn main() {
     let listener = TcpListener::bind("127.0.0.1:8080").unwrap();
@@ -22,35 +22,13 @@ fn main() {
     }
 }
 
-fn handle_client2(stream: TcpStream) {
+fn handle_client(stream: TcpStream) {
     let (result, mut stream) = request::from_stream(stream);
     let res = match result {
         Ok(req) => get_operation(&req.path),
         Err(_) => response::internal_server_error()
     };
     res.write_stream(&mut stream);
-}
-
-fn handle_client(tcp_stream: TcpStream) {
-    let mut stream: BufReader<TcpStream> = BufReader::new(tcp_stream);
-
-    let mut first_line = String::new();
-    if let Err(err) = stream.read_line(&mut first_line) {
-        panic!("error during receive a line: {}", err);
-    }
-
-    let mut params = first_line.split_whitespace();
-    let method = params.next();
-    let path = params.next();
-    let res = match (method, path) {
-        (Some("GET"), Some(path)) => {
-            get_operation(&path.to_string())
-        }
-        _ => response::not_implemented()
-    };
-
-    let mut tcp_stream = stream.into_inner();
-    res.write_stream(&mut tcp_stream);
 }
 
 fn get_operation(path: &String) -> HttpResponse {

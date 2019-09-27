@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::net::TcpStream;
 use std::io::{BufReader, BufRead};
-use std::io::Read;
 
 pub struct HttpRequest {
     method: String,
@@ -9,9 +8,20 @@ pub struct HttpRequest {
     version: String,
     header: HashMap<String, String>,
 }
-pub fn from_stream(tcp_stream: TcpStream) -> (Result<HttpRequest, Box<std::error::Error>>, TcpStream) {
+impl HttpRequest {
+    pub fn to_string(&self) -> String {
+        let mut buf = String::new();
+        buf = format!("{}{} {} HTTP/{}\n", buf, self.method, self.path, self.version);
+        for (k, v) in &self.header {
+            buf = format!("{}{}: {}\n", buf, k, v);
+        }
+        buf
+    }
+}
+pub fn from_stream(tcp_stream: TcpStream) -> (Result<HttpRequest, Box<dyn std::error::Error>>, TcpStream) {
     let mut reader: BufReader<TcpStream> = BufReader::new(tcp_stream);
 
+    // method and path
     let mut first_line = String::new();
     if let Err(err) = reader.read_line(&mut first_line) {
         panic!("error during reading stream: {}", err);
@@ -24,22 +34,31 @@ pub fn from_stream(tcp_stream: TcpStream) -> (Result<HttpRequest, Box<std::error
         _ => panic!("failed to get key and path"),
     };
 
+
+    // header
+    let mut done = false;
     let mut header: HashMap<String, String> = HashMap::new();
-    let mut lines_string = String::new();
-    if let Err(err) = reader.read_to_string(&mut lines_string) {
-        panic!("error during reading stream: {}", err);
+    while !done {
+        let mut line = String::new();
+        if let Err(err) = reader.read_line(&mut line) {
+            panic!("error during reading stream: {}", err);
+        };
+        if !line.contains(":") {
+            done = true;
+        } else {
+            let params: Vec<&str> = line.split(':').collect();
+            if params.len() > 1 {
+                let key = params[0].to_string();
+                let values: Vec<&str> = params.into_iter().skip(1).collect();
+                let value = values.join(":");
+                header.insert(key, value);
+            } else {
+                panic!("failed to get key and value. line: {}", line)
+            }
+        }
     };
 
-    let lines: Vec<&str> = lines_string.split('\n').collect();
-    for line in lines {
-        let mut params = line.split_whitespace();
-        let key = params.next();
-        let value = params.next();
-        match (key, value) {
-            (Some(key), Some(value)) => header.insert(key.to_string(), value.to_string()),
-            (_, _) => None,
-        };
-    }
+    // return
     let req = HttpRequest {
         method,
         path,
