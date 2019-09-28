@@ -5,11 +5,11 @@ use std::net::TcpListener;
 use std::thread;
 
 use env_logger;
-use log::info;
+use log::{info, error};
 
 use web_rust::dispatcher::Dispatcher;
 use std::net::TcpStream;
-use web_rust::request::HttpRequest;
+use web_rust::request::HttpRequestParser;
 use web_rust::response;
 use std::io::BufReader;
 
@@ -36,11 +36,16 @@ fn handle_client(stream: TcpStream) {
     let dispatcher: Dispatcher = Dispatcher{};
     let reader: BufReader<TcpStream> = BufReader::new(stream);
 
-    let (result, reader) =  HttpRequest::from_stream(reader);
+    let mut builder = HttpRequestParser {reader};
+    let result =  builder.parse_stream();
     let res = match result {
-        Err(_) => response::internal_server_error(),
+        Err(e) => {
+            error!("{}", e);
+            response::internal_server_error()
+        },
         Ok(req) => dispatcher.dispatch(req),
     };
+    let reader = builder.reader;
     let mut stream= reader.into_inner();
     res.write_stream(&mut stream);
 }

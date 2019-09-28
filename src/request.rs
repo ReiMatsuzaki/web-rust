@@ -1,14 +1,9 @@
 use std::collections::HashMap;
 use std::io::BufRead;
 use log::info;
-use std::io::{self, Read};
+use std::io;
 use std::num::ParseIntError;
-
-#[derive(Debug)]
-pub enum HttpRequestError {
-    Io(String, io::Error),
-    ParseInt(String, ParseIntError),
-}
+use std::fmt;
 
 pub struct LeadLine {
     pub method: String,
@@ -42,12 +37,12 @@ impl Header {
     fn insert(&mut self, k: String, v: String) {
         self.value.insert(k, v);
     }
-    fn content_length(&self) -> Result<usize, ParseIntError> {
+    fn content_length(&self) -> Result<usize, HttpRequestError> {
         match self.value.get("Content-Length") {
             Some(x) => {
                 match x.trim().parse::<usize>() {
                     Ok(x) => Ok(x),
-                    Err(e) => panic!("failed. e: {}, value: {}, len: {}", e, x, x.len()),
+                    Err(e) => Err(HttpRequestError::ParseInt(e)),
                 }
             }
             None => Ok(0),
@@ -93,10 +88,33 @@ impl HttpRequest {
         buf = format!("{}{}\n", buf, self.body.to_string());
         buf
     }
-    fn read_lead_line<R: BufRead>(mut reader: R) -> (LeadLine, R) {
+}
+
+
+#[derive(Debug)]
+pub enum HttpRequestError {
+    Io(io::Error),
+    ParseInt(ParseIntError),
+    ParseLine {line: String, description: String},
+}
+impl fmt::Display for HttpRequestError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            HttpRequestError::Io(ref e) => write!(f, "IO error: {}", e),
+            HttpRequestError::ParseInt(ref e) => write!(f, "parse int error: {}", e),
+            HttpRequestError::ParseLine{ref line, ref description} => write!(f, "parse line error: {}, line: {}", description, line),
+        }
+    }
+}
+
+pub struct HttpRequestParser<R: BufRead> {
+    pub reader: R
+}
+impl<R: BufRead> HttpRequestParser<R> {
+    fn parse_lead_line(&mut self) -> Result<LeadLine, HttpRequestError> {
         info!("read_first_line begin");
         let mut first_line = String::new();
-        if let Err(err) = reader.read_line(&mut first_line) {
+        if let Err(err) = self.reader.read_line(&mut first_line) {
             panic!("error during reading stream: {}", err);
         };
         let mut params = first_line.split_whitespace();
@@ -107,70 +125,86 @@ impl HttpRequest {
             (Some(method), Some(path)) => (method.to_string(), path.to_string()),
             _ => panic!("failed to get key and path"),
         };
-        (LeadLine{method, path, version}, reader)
+        Ok(LeadLine{method, path, version})
     }
-    fn read_header<R: BufRead>(mut reader: R) -> (Header, R) {
+    fn parse_header(&mut self) -> Result<Header, HttpRequestError> {
         info!("HttpRequest::from_stream read header");
         let mut done = false;
         let mut header = Header::new();
         while !done {
             let mut line = String::new();
-            if let Err(err) = reader.read_line(&mut line) {
-                panic!("error during reading stream: {}", err);
+            if let Err(err) = self.reader.read_line(&mut line) {
+                return Err(HttpRequestError::Io(err))
             };
             info!("line: {}", line);
             if !line.contains(":") {
                 done = true;
             } else {
-                let params: Vec<&str> = line.split(':').collect();
+                let sep = ":";
+                let params: Vec<&str> = line.split(sep).collect();
                 if params.len() > 1 {
                     let key = params[0].to_string();
                     let values: Vec<&str> = params.into_iter().skip(1).collect();
                     let value = values.join(":");
                     header.insert(key, value);
                 } else {
-                    panic!("failed to get key and value. line: {}", line)
+                    let description = "invalid format for header".to_string();
+                    return Err(HttpRequestError::ParseLine{line, description});
                 }
             }
         }
-        (header, reader)
+        Ok(header)
     }
-    fn read_body<R: Read>(mut reader: R, len: usize) -> (Body, R) {
+    fn parse_body(&mut self, len: usize) -> Result<Body, HttpRequestError> {
         let mut buf: Vec<u8> = Vec::with_capacity(len);
         buf.resize(len, 0);
-        if let Err(e) = reader.read(&mut buf) {
-            panic!("error: {}", e);
+        if let Err(e) = self.reader.read(&mut buf) {
+            return Err(HttpRequestError::Io(e))
         }
         let body_str: String = buf.iter().map(|&s| s as char).collect();
         let kvs: Vec<&str> = body_str.split("&").collect();
         let mut body = Body::new();
         for kv in kvs{
             let xs: Vec<&str> = kv.split("=").collect();
-            let k = xs[0];
-            let v = xs[1];
-            body.insert(k.to_string(), v.to_string());
+            let k = xs.iter().next();
+            let v = xs.iter().next();
+            match (k, v) {
+                (Some(k), Some(v)) => {
+                    body.insert(k.to_string(), v.to_string());
+                },
+                _ => {
+                    let line = body_str;
+                    let description = "invalid format for body".to_string();
+                    return Err(HttpRequestError::ParseLine{line, description});
+                }
+            }
         }
-        (body, reader)
+        Ok(body)
     }
 
-    pub fn from_stream<R: BufRead>(reader: R) -> (Result<HttpRequest, Box<dyn std::error::Error>>, R) {
+    pub fn parse_stream(&mut self) -> Result<HttpRequest, HttpRequestError> {
         info!("HttpRequest::from_stream begin");
 
-        let (lead_line, reader) = HttpRequest::read_lead_line(reader);
-        let (header, reader) = HttpRequest::read_header(reader);
-        let len = match header.content_length() {
-            Ok(len) => len,
-            Err(e) => panic!("failed to get content_length: {}", e),
+        let lead_line = match self.parse_lead_line() {
+            Ok(x) => x,
+            Err(e) => return Err(e),
         };
-        info!("len: {}", len);
-        let (body, reader) = HttpRequest::read_body(reader, len);
+        let header = match self.parse_header() {
+            Ok(x) => x,
+            Err(e) => return Err(e),
+        };
+        let len = match header.content_length() {
+            Ok(x) => x,
+            Err(e) => return Err(e),
+        };
+        let body = self.parse_body(len)?;
 
         // return
         let req = HttpRequest {
-            lead_line: lead_line,
+            lead_line,
             header,
             body
         };
-        (Ok(req), reader)
+        Ok(req)
     }
 }
