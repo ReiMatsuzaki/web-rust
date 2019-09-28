@@ -1,24 +1,48 @@
 use std::collections::HashMap;
 use std::io::BufRead;
 use log::info;
-use std::io::Read;
+use std::io::{self, Read};
 use std::num::ParseIntError;
 
+#[derive(Debug)]
+pub enum HttpRequestError {
+    Io(String, io::Error),
+    ParseInt(String, ParseIntError),
+}
+
+pub struct LeadLine {
+    pub method: String,
+    pub path: String,
+    pub version: String,
+}
+impl LeadLine {
+    pub fn to_string(&self) -> String {
+        format!("{} {} HTTP/{}\n", self.method, self.path, self.version)
+    }
+}
+
 pub struct Header {
-    value: HashMap<String, String>
+    value: HashMap<String, String>,
 }
 
 impl Header {
     pub fn new() -> Header {
         let header: HashMap<String, String> = HashMap::new();
         Header {
-            value: header
+            value: header,
         }
     }
-    pub fn insert(&mut self, k: String, v: String) {
+    fn to_string(&self) -> String {
+        let mut buf = String::new();
+        for (k, v) in &self.value {
+            buf = format!("{}{}: {}\n", buf, k, v);
+        };
+        buf
+    }
+    fn insert(&mut self, k: String, v: String) {
         self.value.insert(k, v);
     }
-    pub fn content_length(&self) -> Result<usize, ParseIntError> {
+    fn content_length(&self) -> Result<usize, ParseIntError> {
         match self.value.get("Content-Length") {
             Some(x) => {
                 match x.trim().parse::<usize>() {
@@ -56,24 +80,20 @@ impl Body {
 }
 
 pub struct HttpRequest {
-    pub method: String,
-    pub path: String,
-    version: String,
-    header: Header,
+    pub lead_line: LeadLine,
+    pub header: Header,
     pub body: Body,
 }
 impl HttpRequest {
     pub fn to_string(&self) -> String {
         let mut buf = String::new();
-        buf = format!("{}{} {} HTTP/{}\n", buf, self.method, self.path, self.version);
-        for (k, v) in &self.header.value {
-            buf = format!("{}{}: {}\n", buf, k, v);
-        }
+        buf = format!("{}{}", buf, self.lead_line.to_string());
+        buf = format!("{}{}", buf, self.header.to_string());
         buf = format!("{}\n", buf);
         buf = format!("{}{}\n", buf, self.body.to_string());
         buf
     }
-    fn read_first_line<R: BufRead>(mut reader: R) -> (String, String, R) {
+    fn read_lead_line<R: BufRead>(mut reader: R) -> (LeadLine, R) {
         info!("read_first_line begin");
         let mut first_line = String::new();
         if let Err(err) = reader.read_line(&mut first_line) {
@@ -82,11 +102,12 @@ impl HttpRequest {
         let mut params = first_line.split_whitespace();
         let method = params.next();
         let path = params.next();
+        let version = format!("{}", "1.1");
         let (method, path) = match (method, path) {
             (Some(method), Some(path)) => (method.to_string(), path.to_string()),
             _ => panic!("failed to get key and path"),
         };
-        (method, path, reader)
+        (LeadLine{method, path, version}, reader)
     }
     fn read_header<R: BufRead>(mut reader: R) -> (Header, R) {
         info!("HttpRequest::from_stream read header");
@@ -135,7 +156,7 @@ impl HttpRequest {
     pub fn from_stream<R: BufRead>(reader: R) -> (Result<HttpRequest, Box<dyn std::error::Error>>, R) {
         info!("HttpRequest::from_stream begin");
 
-        let (method, path, reader) = HttpRequest::read_first_line(reader);
+        let (lead_line, reader) = HttpRequest::read_lead_line(reader);
         let (header, reader) = HttpRequest::read_header(reader);
         let len = match header.content_length() {
             Ok(len) => len,
@@ -146,9 +167,7 @@ impl HttpRequest {
 
         // return
         let req = HttpRequest {
-            method,
-            path,
-            version: "1.1".to_string(),
+            lead_line: lead_line,
             header,
             body
         };

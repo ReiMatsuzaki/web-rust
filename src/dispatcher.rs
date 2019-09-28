@@ -16,9 +16,10 @@ pub struct Dispatcher {
 
 impl Dispatcher {
     pub fn dispatch(&self, req: HttpRequest) -> HttpResponse {
-        match &*req.method {
-            "GET" => self.get_operation(&req.path, req.body),
-            "HEAD" => self.head_operation(&req.path),
+        let ll = req.lead_line;
+        match &*ll.method {
+            "GET" => self.get_operation(&ll.path, req.body),
+            "HEAD" => self.head_operation(&ll.path),
             _ => response::not_implemented(),
         }
     }
