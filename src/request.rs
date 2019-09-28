@@ -63,17 +63,17 @@ pub fn from_stream(tcp_stream: TcpStream) -> (Result<HttpRequest, Box<dyn std::e
 
     let mut done = false;
     let mut body = String::new();
-    while !done {
-        let mut line = String::new();
-        if let Err(err) = reader.read_line(&mut line) {
-            panic!("error during reading stream: {}", err);
-        };
-        if !line.contains(":") {
-            done = true;
-        } else {
-            body = format!("{}{}", body, line);
-        }
-    }
+//    while !done {
+//        let mut line = String::new();
+//        if let Err(err) = reader.read_line(&mut line) {
+//            panic!("error during reading stream: {}", err);
+//        };
+//        if !line.contains(":") {
+//            done = true;
+//        } else {
+//            body = format!("{}{}", body, line);
+//        }
+//    }
 
     // return
     let req = HttpRequest {

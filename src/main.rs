@@ -36,6 +36,20 @@ fn handle_client(stream: TcpStream) {
 }
 
 fn get_operation(path: &String) -> HttpResponse {
+    let path_fragments: Vec<&str> = path.split('/').collect();
+    let path_type = path_fragments[1];
+    if path_fragments.len() < 3 {
+        response::not_found()
+    } else {
+        let path: String = path_fragments.into_iter().skip(2).collect();
+        match path_type {
+            "html" => get_operation_html(&path),
+            "ssr" => get_operation_ssr(&path),
+            _ => response::not_found(),
+        }
+    }
+}
+fn get_operation_html(path: &String) -> HttpResponse {
     let path = PathBuf::from(format!("/Users/matsuzakirei/src/github.com/ReiMatsuzaki/web-rust/www{}", path));
     let open_file = File::open(&path);
     match open_file {
@@ -51,6 +65,10 @@ fn get_operation(path: &String) -> HttpResponse {
             response::not_found()
         },
     }
+}
+fn get_operation_ssr(path: &String) -> HttpResponse {
+    let body = format!("<p>this is SSR</p><p>path: {}</p>", path);
+    response::ok(body, true)
 }
 
 fn head_operation(path: &String) -> HttpResponse {
