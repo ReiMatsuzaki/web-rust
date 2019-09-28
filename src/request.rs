@@ -48,23 +48,6 @@ impl Body {
             |(k, v)| format!("{}={}", k, v)).collect();
         kvs.join("&")
     }
-    pub fn read<R: Read>(mut reader: R, len: usize) -> (Body, R) {
-        let mut buf: Vec<u8> = Vec::with_capacity(len);
-        buf.resize(len, 0);
-        if let Err(e) = reader.read(&mut buf) {
-            panic!("error: {}", e);
-        }
-        let body_str: String = buf.iter().map(|&s| s as char).collect();
-        let kvs: Vec<&str> = body_str.split("&").collect();
-        let mut body = Body::new();
-        for kv in kvs{
-            let xs: Vec<&str> = kv.split("=").collect();
-            let k = xs[0];
-            let v = xs[1];
-            body.insert(k.to_string(), v.to_string());
-        }
-        (body, reader)
-    }
     pub fn insert(&mut self, k: String, v: String) {
         self.value.insert(k, v);
     }
@@ -88,64 +71,87 @@ impl HttpRequest {
         buf = format!("{}{}\n", buf, self.body.to_string());
         buf
     }
-}
-pub fn from_stream(tcp_stream: TcpStream) -> (Result<HttpRequest, Box<dyn std::error::Error>>, TcpStream) {
-    info!("HttpRequest::from_stream begin");
-    let mut reader: BufReader<TcpStream> = BufReader::new(tcp_stream);
-
-    info!("HttpRequest::from_stream:read path and method");
-    let mut first_line = String::new();
-    if let Err(err) = reader.read_line(&mut first_line) {
-        panic!("error during reading stream: {}", err);
-    };
-    let mut params = first_line.split_whitespace();
-    let method = params.next();
-    let path = params.next();
-    let (method, path) = match (method, path) {
-        (Some(method), Some(path)) => (method.to_string(), path.to_string()),
-        _ => panic!("failed to get key and path"),
-    };
-
-    info!("HttpRequest::from_stream read header");
-    let mut done = false;
-    let mut header = Header::new();
-    while !done {
-        let mut line = String::new();
-        if let Err(err) = reader.read_line(&mut line) {
+    fn read_first_line<R: BufRead>(mut reader: R) -> (String, String, R) {
+        info!("read_first_line begin");
+        let mut first_line = String::new();
+        if let Err(err) = reader.read_line(&mut first_line) {
             panic!("error during reading stream: {}", err);
         };
-        info!("line: {}", line);
-        if !line.contains(":") {
-            done = true;
-        } else {
-            let params: Vec<&str> = line.split(':').collect();
-            if params.len() > 1 {
-                let key = params[0].to_string();
-                let values: Vec<&str> = params.into_iter().skip(1).collect();
-                let value = values.join(":");
-                header.insert(key, value);
+        let mut params = first_line.split_whitespace();
+        let method = params.next();
+        let path = params.next();
+        let (method, path) = match (method, path) {
+            (Some(method), Some(path)) => (method.to_string(), path.to_string()),
+            _ => panic!("failed to get key and path"),
+        };
+        (method, path, reader)
+    }
+    fn read_header<R: BufRead>(mut reader: R) -> (Header, R) {
+        info!("HttpRequest::from_stream read header");
+        let mut done = false;
+        let mut header = Header::new();
+        while !done {
+            let mut line = String::new();
+            if let Err(err) = reader.read_line(&mut line) {
+                panic!("error during reading stream: {}", err);
+            };
+            info!("line: {}", line);
+            if !line.contains(":") {
+                done = true;
             } else {
-                panic!("failed to get key and value. line: {}", line)
+                let params: Vec<&str> = line.split(':').collect();
+                if params.len() > 1 {
+                    let key = params[0].to_string();
+                    let values: Vec<&str> = params.into_iter().skip(1).collect();
+                    let value = values.join(":");
+                    header.insert(key, value);
+                } else {
+                    panic!("failed to get key and value. line: {}", line)
+                }
             }
         }
+        (header, reader)
+    }
+    fn read_body<R: Read>(mut reader: R, len: usize) -> (Body, R) {
+        let mut buf: Vec<u8> = Vec::with_capacity(len);
+        buf.resize(len, 0);
+        if let Err(e) = reader.read(&mut buf) {
+            panic!("error: {}", e);
+        }
+        let body_str: String = buf.iter().map(|&s| s as char).collect();
+        let kvs: Vec<&str> = body_str.split("&").collect();
+        let mut body = Body::new();
+        for kv in kvs{
+            let xs: Vec<&str> = kv.split("=").collect();
+            let k = xs[0];
+            let v = xs[1];
+            body.insert(k.to_string(), v.to_string());
+        }
+        (body, reader)
     }
 
-    info!("HttpRequest::from_stream read body");
-    let len = match header.content_length() {
-        Ok(len) => len,
-        Err(e) => panic!("failed to get content_length: {}", e),
-    };
-    info!("len: {}", len);
-    let (body, reader) = Body::read(reader, len);
+    pub fn from_stream(tcp_stream: TcpStream) -> (Result<HttpRequest, Box<dyn std::error::Error>>, TcpStream) {
+        info!("HttpRequest::from_stream begin");
+        let mut reader: BufReader<TcpStream> = BufReader::new(tcp_stream);
 
-    // return
-    let req = HttpRequest {
-        method,
-        path,
-        version: "1.1".to_string(),
-        header,
-        body
-    };
-    let tcp_stream = reader.into_inner();
-    (Ok(req), tcp_stream)
+        let (method, path, reader) = HttpRequest::read_first_line(reader);
+        let (header, reader) = HttpRequest::read_header(reader);
+        let len = match header.content_length() {
+            Ok(len) => len,
+            Err(e) => panic!("failed to get content_length: {}", e),
+        };
+        info!("len: {}", len);
+        let (body, reader) = HttpRequest::read_body(reader, len);
+
+        // return
+        let req = HttpRequest {
+            method,
+            path,
+            version: "1.1".to_string(),
+            header,
+            body
+        };
+        let tcp_stream = reader.into_inner();
+        (Ok(req), tcp_stream)
+    }
 }
