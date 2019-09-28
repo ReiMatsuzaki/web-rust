@@ -1,6 +1,5 @@
 use std::collections::HashMap;
-use std::net::TcpStream;
-use std::io::{BufReader, BufRead};
+use std::io::BufRead;
 use log::info;
 use std::io::Read;
 use std::num::ParseIntError;
@@ -51,6 +50,9 @@ impl Body {
     pub fn insert(&mut self, k: String, v: String) {
         self.value.insert(k, v);
     }
+    pub fn get(&self, k: &str) -> &String {
+        &self.value[k]
+    }
 }
 
 pub struct HttpRequest {
@@ -58,7 +60,7 @@ pub struct HttpRequest {
     pub path: String,
     version: String,
     header: Header,
-    body: Body,
+    pub body: Body,
 }
 impl HttpRequest {
     pub fn to_string(&self) -> String {
@@ -130,9 +132,8 @@ impl HttpRequest {
         (body, reader)
     }
 
-    pub fn from_stream(tcp_stream: TcpStream) -> (Result<HttpRequest, Box<dyn std::error::Error>>, TcpStream) {
+    pub fn from_stream<R: BufRead>(reader: R) -> (Result<HttpRequest, Box<dyn std::error::Error>>, R) {
         info!("HttpRequest::from_stream begin");
-        let mut reader: BufReader<TcpStream> = BufReader::new(tcp_stream);
 
         let (method, path, reader) = HttpRequest::read_first_line(reader);
         let (header, reader) = HttpRequest::read_header(reader);
@@ -151,7 +152,6 @@ impl HttpRequest {
             header,
             body
         };
-        let tcp_stream = reader.into_inner();
-        (Ok(req), tcp_stream)
+        (Ok(req), reader)
     }
 }

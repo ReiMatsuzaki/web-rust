@@ -8,6 +8,7 @@ use crate::response;
 use crate::response::HttpResponse;
 use crate::request::HttpRequest;
 use crate::ssr;
+use crate::request;
 
 pub struct Dispatcher {
 
@@ -16,13 +17,13 @@ pub struct Dispatcher {
 impl Dispatcher {
     pub fn dispatch(&self, req: HttpRequest) -> HttpResponse {
         match &*req.method {
-            "GET" => self.get_operation(&req.path),
+            "GET" => self.get_operation(&req.path, req.body),
             "HEAD" => self.head_operation(&req.path),
             _ => response::not_implemented(),
         }
     }
 
-    fn get_operation(&self, path: &String) -> HttpResponse {
+    fn get_operation(&self, path: &String, req_body: request::Body) -> HttpResponse {
         info!("get_operation begin");
 
         let path_fragments: Vec<&str> = path.split('/').collect();
@@ -33,7 +34,7 @@ impl Dispatcher {
             let path: String = path_fragments.into_iter().skip(2).collect();
             match path_type {
                 "html" => self.get_operation_html(&path),
-                "ssr" => ssr::dispatch_ssr(&path),
+                "ssr" => ssr::dispatch_ssr(&path, &req_body),
                 _ => response::not_found(),
             }
         }
