@@ -7,6 +7,7 @@ use log::info;
 use crate::response;
 use crate::response::HttpResponse;
 use crate::request::HttpRequest;
+use crate::ssr;
 
 pub struct Dispatcher {
 
@@ -32,7 +33,7 @@ impl Dispatcher {
             let path: String = path_fragments.into_iter().skip(2).collect();
             match path_type {
                 "html" => self.get_operation_html(&path),
-                "ssr" => self.get_operation_ssr(&path),
+                "ssr" => ssr::dispatch_ssr(&path),
                 _ => response::not_found(),
             }
         }
