@@ -50,6 +50,7 @@ pub fn from_stream(tcp_stream: TcpStream) -> (Result<HttpRequest, Box<dyn std::e
         if let Err(err) = reader.read_line(&mut line) {
             panic!("error during reading stream: {}", err);
         };
+        info!("line: {}", line);
         if !line.contains(":") {
             done = true;
         } else {
@@ -66,19 +67,12 @@ pub fn from_stream(tcp_stream: TcpStream) -> (Result<HttpRequest, Box<dyn std::e
     }
 
     info!("HttpRequest::from_stream read body");
-    let mut done = false;
-    let mut body = String::new();
-//    while !done {
-//        let mut line = String::new();
-//        if let Err(err) = reader.read_line(&mut line) {
-//            panic!("error during reading stream: {}", err);
-//        };
-//        if !line.contains(":") {
-//            done = true;
-//        } else {
-//            body = format!("{}{}", body, line);
-//        }
-//    }
+    let body = String::from("");
+//    let mut body = String::new();
+//    if let Err(err) = reader.read_line(&mut body) {
+//        panic!("error during reading stream: {}", err);
+//    };
+//    info!("body: {}", body);
 
     // return
     let req = HttpRequest {
