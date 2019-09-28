@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::net::TcpStream;
 use std::io::{BufReader, BufRead};
+use log::info;
 
 pub struct HttpRequest {
     pub method: String,
@@ -22,9 +23,11 @@ impl HttpRequest {
     }
 }
 pub fn from_stream(tcp_stream: TcpStream) -> (Result<HttpRequest, Box<dyn std::error::Error>>, TcpStream) {
+    info!("HttpRequest::from_stream begin");
     let mut reader: BufReader<TcpStream> = BufReader::new(tcp_stream);
 
     // method and path
+    info!("HttpRequest::from_stream:read first_line");
     let mut first_line = String::new();
     if let Err(err) = reader.read_line(&mut first_line) {
         panic!("error during reading stream: {}", err);
@@ -39,6 +42,7 @@ pub fn from_stream(tcp_stream: TcpStream) -> (Result<HttpRequest, Box<dyn std::e
 
 
     // header
+    info!("HttpRequest::from_stream read header");
     let mut done = false;
     let mut header: HashMap<String, String> = HashMap::new();
     while !done {
@@ -61,6 +65,7 @@ pub fn from_stream(tcp_stream: TcpStream) -> (Result<HttpRequest, Box<dyn std::e
         }
     }
 
+    info!("HttpRequest::from_stream read body");
     let mut done = false;
     let mut body = String::new();
 //    while !done {

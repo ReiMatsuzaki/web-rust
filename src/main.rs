@@ -5,10 +5,17 @@ use std::io::Read;
 use std::net::{TcpListener, TcpStream};
 use std::path::PathBuf;
 use std::thread;
+use env_logger;
+use log::info;
 use web_rust::response::{self, HttpResponse};
 use web_rust::request;
+use std::env;
 
 fn main() {
+    env::set_var("RUST_LOG", "info");
+    env_logger::init();
+    info!("server begin");
+
     let listener = TcpListener::bind("127.0.0.1:8080").unwrap();
     for stream in listener.incoming() {
         match stream {
@@ -23,6 +30,7 @@ fn main() {
 }
 
 fn handle_client(stream: TcpStream) {
+    info!("handle_client begin");
     let (result, mut stream) = request::from_stream(stream);
     let res = match result {
         Err(_) => response::internal_server_error(),
@@ -36,6 +44,8 @@ fn handle_client(stream: TcpStream) {
 }
 
 fn get_operation(path: &String) -> HttpResponse {
+    info!("get_operation begin");
+
     let path_fragments: Vec<&str> = path.split('/').collect();
     let path_type = path_fragments[1];
     if path_fragments.len() < 3 {
@@ -50,6 +60,8 @@ fn get_operation(path: &String) -> HttpResponse {
     }
 }
 fn get_operation_html(path: &String) -> HttpResponse {
+    info!("get_operation_html begin");
+
     let path = PathBuf::from(format!("/Users/matsuzakirei/src/github.com/ReiMatsuzaki/web-rust/www{}", path));
     let open_file = File::open(&path);
     match open_file {
@@ -67,11 +79,16 @@ fn get_operation_html(path: &String) -> HttpResponse {
     }
 }
 fn get_operation_ssr(path: &String) -> HttpResponse {
+    info!("get_operation_ssr begin");
+
     let body = format!("<p>this is SSR</p><p>path: {}</p>", path);
     response::ok(body, true)
 }
 
+// TODO: head_operation and get_operation are similar.
 fn head_operation(path: &String) -> HttpResponse {
+    info!("head_operation_ssr begin");
+
     let path = PathBuf::from(format!("/Users/matsuzakirei/src/github.com/ReiMatsuzaki/web-rust/www{}", path));
     let open_file = File::open(&path);
     match open_file {
