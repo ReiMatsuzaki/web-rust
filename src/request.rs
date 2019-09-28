@@ -2,19 +2,47 @@ use std::collections::HashMap;
 use std::net::TcpStream;
 use std::io::{BufReader, BufRead};
 use log::info;
+use std::io::Read;
+use std::num::ParseIntError;
+
+pub struct Header {
+    value: HashMap<String, String>
+}
+impl Header {
+    pub fn new() -> Header {
+        let header: HashMap<String, String> = HashMap::new();
+        Header {
+            value: header
+        }
+    }
+    pub fn insert(&mut self, k: String, v: String) {
+        self.value.insert(k, v);
+    }
+    pub fn content_length(&self) -> Result<usize, ParseIntError> {
+        match self.value.get("Content-Length") {
+            Some(x) => {
+                match x.trim().parse::<usize>() {
+                    Ok(x) => Ok(x),
+                    Err(e) => panic!("failed. e: {}, value: {}, len: {}", e, x, x.len()),
+                }
+            }
+            None => Ok(0),
+        }
+    }
+}
 
 pub struct HttpRequest {
     pub method: String,
     pub path: String,
     version: String,
-    header: HashMap<String, String>,
+    header: Header,
     body: String,
 }
 impl HttpRequest {
     pub fn to_string(&self) -> String {
         let mut buf = String::new();
         buf = format!("{}{} {} HTTP/{}\n", buf, self.method, self.path, self.version);
-        for (k, v) in &self.header {
+        for (k, v) in &self.header.value {
             buf = format!("{}{}: {}\n", buf, k, v);
         }
         buf = format!("{}\n", buf);
@@ -26,8 +54,7 @@ pub fn from_stream(tcp_stream: TcpStream) -> (Result<HttpRequest, Box<dyn std::e
     info!("HttpRequest::from_stream begin");
     let mut reader: BufReader<TcpStream> = BufReader::new(tcp_stream);
 
-    // method and path
-    info!("HttpRequest::from_stream:read first_line");
+    info!("HttpRequest::from_stream:read path and method");
     let mut first_line = String::new();
     if let Err(err) = reader.read_line(&mut first_line) {
         panic!("error during reading stream: {}", err);
@@ -40,11 +67,9 @@ pub fn from_stream(tcp_stream: TcpStream) -> (Result<HttpRequest, Box<dyn std::e
         _ => panic!("failed to get key and path"),
     };
 
-
-    // header
     info!("HttpRequest::from_stream read header");
     let mut done = false;
-    let mut header: HashMap<String, String> = HashMap::new();
+    let mut header = Header::new();
     while !done {
         let mut line = String::new();
         if let Err(err) = reader.read_line(&mut line) {
@@ -67,12 +92,18 @@ pub fn from_stream(tcp_stream: TcpStream) -> (Result<HttpRequest, Box<dyn std::e
     }
 
     info!("HttpRequest::from_stream read body");
-    let body = String::from("");
-//    let mut body = String::new();
-//    if let Err(err) = reader.read_line(&mut body) {
-//        panic!("error during reading stream: {}", err);
-//    };
-//    info!("body: {}", body);
+    let len = match header.content_length() {
+        Ok(len) => len,
+        Err(e) => panic!("failed to get content_length: {}", e),
+    };
+    info!("len: {}", len);
+    let mut buf: Vec<u8> = Vec::with_capacity(len);
+    buf.resize(len, 0);
+    if let Err(e) = reader.read(&mut buf) {
+        panic!("error: {}", e);
+    }
+    let body = buf.iter().map(|&s| s as char).collect();
+    info!("body: {}", body);
 
     // return
     let req = HttpRequest {
