@@ -8,6 +8,7 @@ use std::num::ParseIntError;
 pub struct Header {
     value: HashMap<String, String>
 }
+
 impl Header {
     pub fn new() -> Header {
         let header: HashMap<String, String> = HashMap::new();
@@ -31,12 +32,50 @@ impl Header {
     }
 }
 
+pub struct Body {
+    value: HashMap<String, String>
+}
+
+impl Body {
+    pub fn new() -> Body {
+        let header: HashMap<String, String> = HashMap::new();
+        Body {
+            value: header
+        }
+    }
+    pub fn to_string(&self) -> String {
+        let kvs: Vec<String> = self.value.iter().map(
+            |(k, v)| format!("{}={}", k, v)).collect();
+        kvs.join("&")
+    }
+    pub fn read<R: Read>(mut reader: R, len: usize) -> (Body, R) {
+        let mut buf: Vec<u8> = Vec::with_capacity(len);
+        buf.resize(len, 0);
+        if let Err(e) = reader.read(&mut buf) {
+            panic!("error: {}", e);
+        }
+        let body_str: String = buf.iter().map(|&s| s as char).collect();
+        let kvs: Vec<&str> = body_str.split("&").collect();
+        let mut body = Body::new();
+        for kv in kvs{
+            let xs: Vec<&str> = kv.split("=").collect();
+            let k = xs[0];
+            let v = xs[1];
+            body.insert(k.to_string(), v.to_string());
+        }
+        (body, reader)
+    }
+    pub fn insert(&mut self, k: String, v: String) {
+        self.value.insert(k, v);
+    }
+}
+
 pub struct HttpRequest {
     pub method: String,
     pub path: String,
     version: String,
     header: Header,
-    body: String,
+    body: Body,
 }
 impl HttpRequest {
     pub fn to_string(&self) -> String {
@@ -46,7 +85,7 @@ impl HttpRequest {
             buf = format!("{}{}: {}\n", buf, k, v);
         }
         buf = format!("{}\n", buf);
-        buf = format!("{}{}\n", buf, self.body);
+        buf = format!("{}{}\n", buf, self.body.to_string());
         buf
     }
 }
@@ -97,13 +136,7 @@ pub fn from_stream(tcp_stream: TcpStream) -> (Result<HttpRequest, Box<dyn std::e
         Err(e) => panic!("failed to get content_length: {}", e),
     };
     info!("len: {}", len);
-    let mut buf: Vec<u8> = Vec::with_capacity(len);
-    buf.resize(len, 0);
-    if let Err(e) = reader.read(&mut buf) {
-        panic!("error: {}", e);
-    }
-    let body = buf.iter().map(|&s| s as char).collect();
-    info!("body: {}", body);
+    let (body, reader) = Body::read(reader, len);
 
     // return
     let req = HttpRequest {
