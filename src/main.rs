@@ -11,7 +11,7 @@ use web_rust::dispatcher::Dispatcher;
 use std::net::TcpStream;
 use web_rust::request::HttpRequestParser;
 use web_rust::response;
-use std::io::BufReader;
+use std::io::{self, BufReader};
 
 fn main() {
     env::set_var("RUST_LOG", "info");
@@ -37,16 +37,23 @@ fn handle_client(stream: TcpStream) {
     let reader: BufReader<TcpStream> = BufReader::new(stream);
 
     let mut builder = HttpRequestParser { reader };
-    let res = match builder.parse_stream() {
+    let rep = match builder.parse_stream() {
         Err(e) => {
             error!("{}", e);
             response::internal_server_error()
         },
-        Ok(req) => dispatcher.dispatch(req),
+        Ok(req) => {
+            info!("request: ");
+            println!("{}", req.to_string());
+            dispatcher.dispatch(req)
+        },
     };
+    info!("response: ");
+    rep.write_stream(&mut io::stdout()).unwrap();
+
     let reader = builder.reader;
     let mut stream = reader.into_inner();
-    match res.write_stream(&mut stream) {
+    match rep.write_stream(&mut stream) {
         Err(e) => {
             error!("{}", e);
         },

@@ -148,7 +148,7 @@ impl<R: BufRead> HttpRequestParser<R> {
                 if params.len() > 1 {
                     let key = params[0].to_string();
                     let values: Vec<&str> = params.into_iter().skip(1).collect();
-                    let value = values.join(":");
+                    let value = values.join(":").trim().to_string();
                     header.insert(key, value);
                 } else {
                     let description = "invalid format for header".to_string();
