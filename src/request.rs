@@ -113,17 +113,20 @@ pub struct HttpRequestParser<R: BufRead> {
 impl<R: BufRead> HttpRequestParser<R> {
     fn parse_lead_line(&mut self) -> Result<LeadLine, HttpRequestError> {
         info!("read_first_line begin");
-        let mut first_line = String::new();
-        if let Err(err) = self.reader.read_line(&mut first_line) {
+        let mut line = String::new();
+        if let Err(err) = self.reader.read_line(&mut line) {
             panic!("error during reading stream: {}", err);
         };
-        let mut params = first_line.split_whitespace();
+        let mut params = line.split_whitespace();
         let method = params.next();
         let path = params.next();
         let version = format!("{}", "1.1");
         let (method, path) = match (method, path) {
             (Some(method), Some(path)) => (method.to_string(), path.to_string()),
-            _ => panic!("failed to get key and path"),
+            _ => {
+                let description = "failed to parse lead line".to_string();
+                return Err(HttpRequestError::ParseLine{line, description})
+            }
         };
         Ok(LeadLine{method, path, version})
     }
@@ -156,26 +159,30 @@ impl<R: BufRead> HttpRequestParser<R> {
         Ok(header)
     }
     fn parse_body(&mut self, len: usize) -> Result<Body, HttpRequestError> {
-        let mut buf: Vec<u8> = Vec::with_capacity(len);
-        buf.resize(len, 0);
-        if let Err(e) = self.reader.read(&mut buf) {
-            return Err(HttpRequestError::Io(e))
-        }
-        let body_str: String = buf.iter().map(|&s| s as char).collect();
-        let kvs: Vec<&str> = body_str.split("&").collect();
+
         let mut body = Body::new();
-        for kv in kvs{
-            let xs: Vec<&str> = kv.split("=").collect();
-            let k = xs.iter().next();
-            let v = xs.iter().next();
-            match (k, v) {
-                (Some(k), Some(v)) => {
-                    body.insert(k.to_string(), v.to_string());
-                },
-                _ => {
-                    let line = body_str;
-                    let description = "invalid format for body".to_string();
-                    return Err(HttpRequestError::ParseLine{line, description});
+        if len > 0 {
+            let mut buf: Vec<u8> = Vec::with_capacity(len);
+            buf.resize(len, 0);
+            if let Err(e) = self.reader.read(&mut buf) {
+                return Err(HttpRequestError::Io(e))
+            }
+            let body_str: String = buf.iter().map(|&s| s as char).collect();
+            let kvs: Vec<&str> = body_str.split("&").collect();
+
+            for kv in kvs {
+                let xs: Vec<&str> = kv.split("=").collect();
+                let k = xs.iter().next();
+                let v = xs.iter().next();
+                match (k, v) {
+                    (Some(k), Some(v)) => {
+                        body.insert(k.to_string(), v.to_string());
+                    },
+                    _ => {
+                        let line = body_str;
+                        let description = "invalid format for body".to_string();
+                        return Err(HttpRequestError::ParseLine { line, description });
+                    }
                 }
             }
         }

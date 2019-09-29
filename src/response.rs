@@ -16,7 +16,7 @@ impl HttpResponse {
         for (k, v) in &self.key_values {
             writeln!(stream, "{}: {}", k, v).unwrap();
         }
-        writeln!(stream).unwrap();
+        writeln!(stream, " ").unwrap();
         writeln!(stream, "{}", self.body).unwrap();
     }
 }
