@@ -1,6 +1,9 @@
 use std::collections::HashMap;
-use std::io::Write;
-use std::net::TcpStream;
+use std::io::{self, Write};
+
+pub enum HttpResponseError {
+    Io(io::Error),
+}
 
 pub struct HttpResponse {
     version: String,
@@ -10,14 +13,15 @@ pub struct HttpResponse {
     body: String
 }
 impl HttpResponse {
-    pub fn write_stream(&self, stream: &mut TcpStream) {
+    pub fn write_stream<W: Write>(&self, writer: &mut W) -> Result<(), io::Error> {
         let line = format!("HTTP/{} {} {}", self.version, self.code, self.description);
-        writeln!(stream, "{}", &line).unwrap();
+        writeln!(writer, "{}", &line)?;
         for (k, v) in &self.key_values {
-            writeln!(stream, "{}: {}", k, v).unwrap();
+            writeln!(writer, "{}: {}", k, v)?;
         }
-        writeln!(stream, " ").unwrap();
-        writeln!(stream, "{}", self.body).unwrap();
+        writeln!(writer, " ")?;
+        writeln!(writer, "{}", self.body)?;
+        Ok(())
     }
 }
 fn empty_response(code: i32, description: &str) -> HttpResponse {

@@ -33,12 +33,11 @@ fn main() {
 
 fn handle_client(stream: TcpStream) {
     info!("handle begin");
-    let dispatcher: Dispatcher = Dispatcher{};
+    let dispatcher: Dispatcher = Dispatcher {};
     let reader: BufReader<TcpStream> = BufReader::new(stream);
 
-    let mut builder = HttpRequestParser {reader};
-    let result =  builder.parse_stream();
-    let res = match result {
+    let mut builder = HttpRequestParser { reader };
+    let res = match builder.parse_stream() {
         Err(e) => {
             error!("{}", e);
             response::internal_server_error()
@@ -46,26 +45,13 @@ fn handle_client(stream: TcpStream) {
         Ok(req) => dispatcher.dispatch(req),
     };
     let reader = builder.reader;
-    let mut stream= reader.into_inner();
-    res.write_stream(&mut stream);
+    let mut stream = reader.into_inner();
+    match res.write_stream(&mut stream) {
+        Err(e) => {
+            error!("{}", e);
+        },
+        Ok(()) => {
+            info!("handle success")
+        },
+    };
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
