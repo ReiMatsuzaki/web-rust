@@ -1,7 +1,5 @@
 use std::collections::HashMap;
 use std::io::{self, Write};
-use std::path::PathBuf;
-use std::fs::File;
 
 pub enum HttpResponseError {
     Io(io::Error),
@@ -21,18 +19,8 @@ impl HttpResponse {
         for (k, v) in &self.key_values {
             writeln!(writer, "{}: {}", k, v)?;
         }
-
-        // FIXME
-//        writeln!(writer, " ")?;
         writeln!(writer)?;
-
-        // FIXME:
-        //writeln!(writer, "{}", self.body)?;
-        let path = PathBuf::from("/tmp/tmp.txt");
-        let mut file = File::create(&path).unwrap();
-        write!(file, "{}", self.body).unwrap();
-        let mut file = File::open(&path).unwrap();
-        io::copy(&mut file, writer).unwrap();
+        writeln!(writer, "{}", self.body)?;
 
         Ok(())
     }
@@ -49,14 +37,9 @@ fn empty_response(code: i32, description: &str) -> HttpResponse {
         body
     }
 }
-fn contents_len(body: &String) -> u64 {
-    let path = PathBuf::from("/tmp/tmp.txt");
-    let mut file = File::create(&path).unwrap();
-    write!(file, "{}", body).unwrap();
-
-    let file = File::open(&path).unwrap();
-    let x= file.metadata().map(|m| m.len()).unwrap_or(0);
-    x
+fn contents_len(body: &String) -> String {
+    let x=  body.len();
+    format!("{}", x)
 }
 pub fn ok(body: String, contain_body: bool) -> HttpResponse {
 
@@ -64,7 +47,7 @@ pub fn ok(body: String, contain_body: bool) -> HttpResponse {
 
     let mut key_values = HashMap::new();
     key_values.insert("Content-Type".to_string(), "text/html; charset=UTF-8".to_string());
-    key_values.insert("Content-Length".to_string(), format!("{}", len));
+    key_values.insert("Content-Length".to_string(), len);
 
     let body = if contain_body { body } else { String::from("") };
 
