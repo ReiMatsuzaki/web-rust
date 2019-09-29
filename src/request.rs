@@ -69,8 +69,8 @@ impl Body {
     pub fn insert(&mut self, k: String, v: String) {
         self.value.insert(k, v);
     }
-    pub fn get(&self, k: &str) -> &String {
-        &self.value[k]
+    pub fn get(&self, k: &str) -> Option<&String> {
+        self.value.get(k)
     }
 }
 
@@ -172,8 +172,9 @@ impl<R: BufRead> HttpRequestParser<R> {
 
             for kv in kvs {
                 let xs: Vec<&str> = kv.split("=").collect();
-                let k = xs.iter().next();
-                let v = xs.iter().next();
+                let mut xs = xs.iter();
+                let k = xs.next();
+                let v = xs.next();
                 match (k, v) {
                     (Some(k), Some(v)) => {
                         body.insert(k.to_string(), v.to_string());
