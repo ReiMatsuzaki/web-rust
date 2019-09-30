@@ -7,7 +7,7 @@ pub enum HttpResponseError {
 
 pub struct HttpResponse {
     version: String,
-    code: i32,
+    pub code: i32,
     description: String,
     key_values: HashMap<String, String>,
     body: String

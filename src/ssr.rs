@@ -2,16 +2,21 @@ use crate::response::{self, HttpResponse};
 use crate::request;
 use log::{info, error};
 use std::fmt;
+use base64::{decode, DecodeError};
 
 #[derive(Debug)]
 pub enum SsrError {
     KeyNotExists { key: String },
+    InvalidLine { line: String },
+    DecodeError(DecodeError),
 }
 
 impl fmt::Display for SsrError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            SsrError::KeyNotExists { ref key } => write!(f, "key: {}", key)
+        match self {
+            SsrError::KeyNotExists { ref key } => write!(f, "key: {}", key),
+            SsrError::InvalidLine {ref line } => write!(f, "line: {}", line),
+            SsrError::DecodeError(e) => write!(f, "{}", e),
         }
     }
 }
@@ -124,21 +129,66 @@ fn ssr_31_010(req: &request::HttpRequest) -> Result<HttpResponse, SsrError> {
     let header = &req.header;
     let line = header.get("Authorization");
     match line {
+        None => Ok(response::unauthorized()),
         Some(line) => {
-            let mut params = line.split_whitespace();
-            let method = params.next().unwrap();
-            let path = params.next().unwrap();
-
             let mut xs = line.trim().split_whitespace();
-            let x0 = xs.next().unwrap();
-            let x1 = xs.next().unwrap();
-            info!("x0", x0);
-            info!("x1", x1);
-            Ok(response::unauthorized())
+            let x0 = xs.next().unwrap().trim();
+            if x0!="Basic" {
+                Err(SsrError::InvalidLine{line: x0.to_string()})
+            } else {
+                let coded = xs.next().unwrap();
+                match decode(coded) {
+                    Err(e) => Err(SsrError::DecodeError(e)),
+                    Ok(decoded) => {
+                        let decoded: String = decoded.iter().map(|&s| s as char).collect();
+                        if decoded == "aa:bb" {
+                            Ok(ssr_31_010_page())
+                        } else {
+                            Ok(response::unauthorized())
+                        }
+                    },
+                }
+            }
+
         },
-        None => {
-            Ok(response::unauthorized())
-        }
+    }
+}
+fn ssr_31_010_page() -> HttpResponse {
+    let body = format!("<html>
+    <head><title>check</title></head>
+    <body>
+        name: aa<br>
+        pass: bb<br>
+    </body>
+    </html>
+    ");
+    response::ok(body, true)
+}
+
+#[test]
+fn ssr_test() {
+    use base64::encode;
+
+    fn get_req(name_pass: &str) -> request::HttpRequest {
+        let value = format!("method {}", encode(name_pass));
+
+        let lead_line = request::LeadLine::get("path".to_string());
+        let mut header = request::Header::new();
+        header.insert("Authorization".to_string(), value);
+        let header = header;
+
+        let body = request::Body::new();
+
+        request::HttpRequest {lead_line, header, body}
     }
 
+    let req = get_req("aa:bb");
+    let rep = ssr_31_010(&req);
+    let res= rep.map(|x| x.code).unwrap();
+    assert_eq!(res, 200);
+
+    let req = get_req("aa:bc");
+    let rep = ssr_31_010(&req);
+    let res= rep.map(|x| x.code).unwrap();
+    assert_eq!(res, 401);
 }
