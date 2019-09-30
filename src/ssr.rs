@@ -16,14 +16,14 @@ impl fmt::Display for SsrError {
     }
 }
 
-pub fn dispatch_ssr(path: &String, req_body: &request::Body) -> HttpResponse {
+pub fn dispatch_ssr(path: &String, req: &request::HttpRequest) -> HttpResponse {
     info!("dispatch_str begin");
     let result = match path.as_str() {
         "page1" => ssr_page1(path),
         "31_002" => ssr_31_002(),
-        "31_003" => ssr_31_003(req_body),
-        "31_004" => ssr_31_004(req_body),
-        "31_010" => ssr_31_010(),
+        "31_003" => ssr_31_003(&req.body),
+        "31_004" => ssr_31_004(&req.body),
+        "31_010" => ssr_31_010(req),
         _ => Ok(response::not_found()),
     };
     match result {
@@ -120,7 +120,25 @@ fn ssr_31_004(req_body: &request::Body) -> Result<HttpResponse, SsrError> {
     Ok(response::ok(body, true))
 }
 
-fn ssr_31_010(header: &request::Header, req_body: &request::Body) -> Result<HttpResponse, SsrError> {
-    let code = header.get("authorized");
-    Ok(response::unauthorized())
+fn ssr_31_010(req: &request::HttpRequest) -> Result<HttpResponse, SsrError> {
+    let header = &req.header;
+    let line = header.get("Authorization");
+    match line {
+        Some(line) => {
+            let mut params = line.split_whitespace();
+            let method = params.next().unwrap();
+            let path = params.next().unwrap();
+
+            let mut xs = line.trim().split_whitespace();
+            let x0 = xs.next().unwrap();
+            let x1 = xs.next().unwrap();
+            info!("x0", x0);
+            info!("x1", x1);
+            Ok(response::unauthorized())
+        },
+        None => {
+            Ok(response::unauthorized())
+        }
+    }
+
 }

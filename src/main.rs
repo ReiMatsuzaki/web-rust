@@ -45,7 +45,7 @@ fn handle_client(stream: TcpStream) {
         Ok(req) => {
             info!("request: ");
             println!("{}", req.to_string());
-            dispatcher.dispatch(req)
+            dispatcher.dispatch(&req)
         },
     };
     info!("response: ");
