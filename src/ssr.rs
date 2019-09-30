@@ -120,6 +120,7 @@ fn ssr_31_004(req_body: &request::Body) -> Result<HttpResponse, SsrError> {
     Ok(response::ok(body, true))
 }
 
-fn ssr_31_010() -> Result<HttpResponse, SsrError> {
+fn ssr_31_010(header: &request::Header, req_body: &request::Body) -> Result<HttpResponse, SsrError> {
+    let code = header.get("authorized");
     Ok(response::unauthorized())
 }

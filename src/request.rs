@@ -37,6 +37,9 @@ impl Header {
     fn insert(&mut self, k: String, v: String) {
         self.value.insert(k, v);
     }
+    pub fn get(&self, k: &str) -> Option<&String> {
+        self.value.get(k)
+    }
     fn content_length(&self) -> Result<usize, HttpRequestError> {
         match self.value.get("Content-Length") {
             Some(x) => {
