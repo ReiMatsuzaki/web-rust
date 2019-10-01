@@ -1,3 +1,6 @@
-pub mod dispatcher;
-pub mod ssr;
-pub mod web_server;
+pub use self::dispatcher::Dispatcher;
+pub use self::web_server::{WebServer, WebServerStatus};
+
+mod dispatcher;
+mod ssr;
+mod web_server;

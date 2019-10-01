@@ -1,6 +1,6 @@
 use std::collections::HashMap;
-use crate::request::http_request::HttpRequest;
-use crate::response::http_response::HttpResponse;
+use crate::request::HttpRequest;
+use crate::response::HttpResponse;
 use crate::web_server::dispatcher::Dispatcher;
 
 pub struct WebServerStatus {

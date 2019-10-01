@@ -1,6 +1,6 @@
 use std::io;
 
-pub enum HttpResponseError {
+pub enum Error {
     Io(io::Error),
 }
 

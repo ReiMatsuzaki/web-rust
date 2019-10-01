@@ -4,10 +4,9 @@ use std::path::PathBuf;
 
 use log::info;
 
-use crate::request::http_request::HttpRequest;
-use crate::response::http_response::HttpResponse;
-use crate::web_server::web_server::WebServerStatus;
-use crate::web_server::ssr;
+use crate::request::HttpRequest;
+use crate::response::HttpResponse;
+use crate::web_server::{WebServerStatus, ssr};
 
 pub struct Dispatcher {
 

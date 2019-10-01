@@ -6,10 +6,8 @@ pub struct Body {
 
 impl Body {
     pub fn new() -> Body {
-        let header: HashMap<String, String> = HashMap::new();
-        Body {
-            value: header
-        }
+        let value: HashMap<String, String> = HashMap::new();
+        Body { value }
     }
     pub fn to_string(&self) -> String {
         let kvs: Vec<String> = self.value.iter().map(

@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use crate::request::error::HttpRequestError;
+use crate::request::error::Error;
 
 pub struct Header {
     value: HashMap<String, String>,
@@ -25,12 +25,12 @@ impl Header {
     pub fn get(&self, k: &str) -> Option<&String> {
         self.value.get(k)
     }
-    pub fn content_length(&self) -> Result<usize, HttpRequestError> {
+    pub fn content_length(&self) -> Result<usize, Error> {
         match self.value.get("Content-Length") {
             Some(x) => {
                 match x.trim().parse::<usize>() {
                     Ok(x) => Ok(x),
-                    Err(e) => Err(HttpRequestError::ParseInt(e)),
+                    Err(e) => Err(Error::ParseInt(e)),
                 }
             }
             None => Ok(0),

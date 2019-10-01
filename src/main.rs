@@ -8,9 +8,9 @@ use std::io::{self, BufReader};
 
 use env_logger;
 use log::{info, error};
-use web_rust::application::request::HttpRequestParser;
-use web_rust::response::http_response::HttpResponse;
-use web_rust::web_server::web_server::WebServer;
+use web_rust::response::HttpResponse;
+use web_rust::request::Parser;
+use web_rust::web_server::WebServer;
 
 fn main() {
     env::set_var("RUST_LOG", "info");
@@ -34,7 +34,7 @@ fn handle_client(stream: TcpStream) {
     info!("handle begin");
     let mut web_server = WebServer::new();
     let reader: BufReader<TcpStream> = BufReader::new(stream);
-    let mut builder = HttpRequestParser { reader };
+    let mut builder = Parser { reader };
     let rep = match builder.parse_stream() {
         Err(e) => {
             error!("{}", e);

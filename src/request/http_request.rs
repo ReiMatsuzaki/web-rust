@@ -1,7 +1,7 @@
 use crate::request::lead_line::LeadLine;
 use crate::request::header::Header;
 use crate::request::body::Body;
-use std::io::Write;
+use std::io::{self, Write};
 
 pub struct HttpRequest {
     pub lead_line: LeadLine,
@@ -18,10 +18,12 @@ impl HttpRequest{
         buf = format!("{}{}\n", buf, self.body.to_string());
         buf
     }
-    pub fn write<W: Write>(&self, w: &mut W) {
-        write!(w, "{}", self.lead_line.to_string());
-        write!(w, "{}", self.header.to_string());
-        write!(w, "\n");
-        write!(w, "{}\n", self.body.to_string());
+    pub fn write<W: Write>(&self, w: &mut W) -> Result<(), io::Error> {
+        writeln!(w, "{}", self.lead_line.to_string())?;
+        writeln!(w, "{}", self.header.to_string())?;
+        writeln!(w, "")?;
+        writeln!(w, "{}", self.body.to_string())?;
+        Ok(())
     }
 }
+
