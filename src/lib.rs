@@ -2,6 +2,7 @@ pub mod request;
 pub mod response;
 pub mod dispatcher;
 pub mod ssr;
+pub mod web_server;
 
 #[cfg(test)]
 mod tests {

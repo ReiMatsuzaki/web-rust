@@ -9,23 +9,24 @@ use crate::response::HttpResponse;
 use crate::request::HttpRequest;
 use crate::ssr;
 use crate::request;
+use crate::web_server::WebServerStatus;
 
 pub struct Dispatcher {
 
 }
 
 impl Dispatcher {
-    pub fn dispatch(&self, req: &HttpRequest) -> HttpResponse {
+    pub fn dispatch(&self, req: &HttpRequest, status: &mut WebServerStatus) -> HttpResponse {
         let ll = &req.lead_line;
         match &*ll.method {
-            "GET" => self.get_operation(&ll.path, req),
-            "POST" => self.post_operation(&ll.path, req),
+            "GET" => self.get_operation(&ll.path, req, status),
+            "POST" => self.post_operation(&ll.path, req, status),
             "HEAD" => self.head_operation(&ll.path),
             _ => response::not_implemented(),
         }
     }
 
-    fn get_operation(&self, path: &String, req: &request::HttpRequest) -> HttpResponse {
+    fn get_operation(&self, path: &String, req: &request::HttpRequest, status: &mut WebServerStatus) -> HttpResponse {
         info!("get_operation begin");
 
         let path_fragments: Vec<&str> = path.split('/').collect();
@@ -36,7 +37,7 @@ impl Dispatcher {
             let path: String = path_fragments.into_iter().skip(2).collect();
             match path_type {
                 "html" => self.get_operation_html(&path),
-                "ssr" => ssr::dispatch_ssr(&path, req),
+                "ssr" => ssr::dispatch_ssr(&path, req, status),
                 _ => response::not_found(),
             }
         }
@@ -62,7 +63,7 @@ impl Dispatcher {
         }
     }
 
-    fn post_operation(&self, path: &String, req: &request::HttpRequest) -> HttpResponse {
+    fn post_operation(&self, path: &String, req: &request::HttpRequest, status: &mut WebServerStatus) -> HttpResponse {
         info!("post_operation begin");
 
         let path_fragments: Vec<&str> = path.split('/').collect();
@@ -73,7 +74,7 @@ impl Dispatcher {
             let path: String = path_fragments.into_iter().skip(2).collect();
             match path_type {
                 "html" => self.get_operation_html(&path),
-                "ssr" => ssr::dispatch_ssr(&path, &req),
+                "ssr" => ssr::dispatch_ssr(&path, &req, status),
                 _ => response::not_found(),
             }
         }

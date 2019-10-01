@@ -3,6 +3,7 @@ use crate::request;
 use log::{info, error};
 use std::fmt;
 use base64::{decode, DecodeError};
+use crate::web_server::WebServerStatus;
 
 #[derive(Debug)]
 pub enum SsrError {
@@ -15,13 +16,15 @@ impl fmt::Display for SsrError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             SsrError::KeyNotExists { ref key } => write!(f, "key: {}", key),
-            SsrError::InvalidLine {ref line } => write!(f, "line: {}", line),
+            SsrError::InvalidLine { ref line } => write!(f, "line: {}", line),
             SsrError::DecodeError(e) => write!(f, "{}", e),
         }
     }
 }
 
-pub fn dispatch_ssr(path: &String, req: &request::HttpRequest) -> HttpResponse {
+pub fn dispatch_ssr(path: &String,
+                    req: &request::HttpRequest,
+                    status: &mut WebServerStatus) -> HttpResponse {
     info!("dispatch_str begin");
     let result = match path.as_str() {
         "page1" => ssr_page1(path),
@@ -29,6 +32,7 @@ pub fn dispatch_ssr(path: &String, req: &request::HttpRequest) -> HttpResponse {
         "31_003" => ssr_31_003(&req.body),
         "31_004" => ssr_31_004(&req.body),
         "31_010" => ssr_31_010(req),
+        "31_011" => ssr_31_011(req, status),
         _ => Ok(response::not_found()),
     };
     match result {
@@ -133,8 +137,8 @@ fn ssr_31_010(req: &request::HttpRequest) -> Result<HttpResponse, SsrError> {
         Some(line) => {
             let mut xs = line.trim().split_whitespace();
             let x0 = xs.next().unwrap().trim();
-            if x0!="Basic" {
-                Err(SsrError::InvalidLine{line: x0.to_string()})
+            if x0 != "Basic" {
+                Err(SsrError::InvalidLine { line: x0.to_string() })
             } else {
                 let coded = xs.next().unwrap();
                 match decode(coded) {
@@ -146,13 +150,13 @@ fn ssr_31_010(req: &request::HttpRequest) -> Result<HttpResponse, SsrError> {
                         } else {
                             Ok(response::unauthorized())
                         }
-                    },
+                    }
                 }
             }
-
-        },
+        }
     }
 }
+
 fn ssr_31_010_page() -> HttpResponse {
     let body = format!("<html>
     <head><title>check</title></head>
@@ -163,6 +167,10 @@ fn ssr_31_010_page() -> HttpResponse {
     </html>
     ");
     response::ok(body, true)
+}
+
+fn ssr_31_011(_: &request::HttpRequest, _: &mut WebServerStatus) -> Result<HttpResponse, SsrError> {
+    Ok(response::not_found())
 }
 
 #[test]
@@ -179,16 +187,16 @@ fn ssr_test() {
 
         let body = request::Body::new();
 
-        request::HttpRequest {lead_line, header, body}
+        request::HttpRequest { lead_line, header, body }
     }
 
     let req = get_req("aa:bb");
     let rep = ssr_31_010(&req);
-    let res= rep.map(|x| x.code).unwrap();
+    let res = rep.map(|x| x.code).unwrap();
     assert_eq!(res, 200);
 
     let req = get_req("aa:bc");
     let rep = ssr_31_010(&req);
-    let res= rep.map(|x| x.code).unwrap();
+    let res = rep.map(|x| x.code).unwrap();
     assert_eq!(res, 401);
 }
