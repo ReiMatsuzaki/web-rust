@@ -58,10 +58,10 @@ impl LeadLine {
                 return Err(Error::ParseLine{line, description})
             }
         };
-        if LeadLine::is_valid_version(&version) {
-            Ok(LeadLine{method, path, version})
-        } else {
+        if !LeadLine::is_valid_version(&version) {
             Err(Error::InvalidVersion{version})
+        } else {
+            Ok(LeadLine{method, path, version})
         }
 
     }
