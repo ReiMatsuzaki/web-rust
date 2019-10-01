@@ -1,3 +1,5 @@
+use std::io::Write;
+
 pub struct LeadLine {
     pub method: String,
     pub path: String,
