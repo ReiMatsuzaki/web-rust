@@ -3,15 +3,14 @@ extern crate web_rust;
 use std::env;
 use std::net::TcpListener;
 use std::thread;
+use std::net::TcpStream;
+use std::io::{self, BufReader};
 
 use env_logger;
 use log::{info, error};
-
-use web_rust::dispatcher::Dispatcher;
-use std::net::TcpStream;
-use web_rust::request::HttpRequestParser;
-use web_rust::response;
-use std::io::{self, BufReader};
+use web_rust::application::request::HttpRequestParser;
+use web_rust::response::http_response::HttpResponse;
+use web_rust::web_server::web_server::WebServer;
 
 fn main() {
     env::set_var("RUST_LOG", "info");
@@ -33,26 +32,25 @@ fn main() {
 
 fn handle_client(stream: TcpStream) {
     info!("handle begin");
-    let dispatcher: Dispatcher = Dispatcher {};
+    let mut web_server = WebServer::new();
     let reader: BufReader<TcpStream> = BufReader::new(stream);
-
     let mut builder = HttpRequestParser { reader };
     let rep = match builder.parse_stream() {
         Err(e) => {
             error!("{}", e);
-            response::internal_server_error()
+            HttpResponse::internal_server_error()
         },
         Ok(req) => {
             info!("request: ");
             println!("{}", req.to_string());
-            dispatcher.dispatch(&req)
+            web_server.response(&req)
         },
     };
     info!("response: ");
     rep.write_stream(&mut io::stdout()).unwrap();
+    let mut stream = builder.reader.into_inner();
 
-    let reader = builder.reader;
-    let mut stream = reader.into_inner();
+
     match rep.write_stream(&mut stream) {
         Err(e) => {
             error!("{}", e);

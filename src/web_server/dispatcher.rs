@@ -4,12 +4,10 @@ use std::path::PathBuf;
 
 use log::info;
 
-use crate::response;
-use crate::response::HttpResponse;
-use crate::request::HttpRequest;
-use crate::ssr;
-use crate::request;
-use crate::web_server::WebServerStatus;
+use crate::request::http_request::HttpRequest;
+use crate::response::http_response::HttpResponse;
+use crate::web_server::web_server::WebServerStatus;
+use crate::web_server::ssr;
 
 pub struct Dispatcher {
 
@@ -22,23 +20,23 @@ impl Dispatcher {
             "GET" => self.get_operation(&ll.path, req, status),
             "POST" => self.post_operation(&ll.path, req, status),
             "HEAD" => self.head_operation(&ll.path),
-            _ => response::not_implemented(),
+            _ => HttpResponse::not_implemented(),
         }
     }
 
-    fn get_operation(&self, path: &String, req: &request::HttpRequest, status: &mut WebServerStatus) -> HttpResponse {
+    fn get_operation(&self, path: &String, req: &HttpRequest, status: &mut WebServerStatus) -> HttpResponse {
         info!("get_operation begin");
 
         let path_fragments: Vec<&str> = path.split('/').collect();
         let path_type = path_fragments[1];
         if path_fragments.len() < 3 {
-            response::not_found()
+            HttpResponse::not_found()
         } else {
             let path: String = path_fragments.into_iter().skip(2).collect();
             match path_type {
                 "html" => self.get_operation_html(&path),
                 "ssr" => ssr::dispatch_ssr(&path, req, status),
-                _ => response::not_found(),
+                _ => HttpResponse::not_found(),
             }
         }
     }
@@ -53,29 +51,29 @@ impl Dispatcher {
                 let mut body = String::new();
                 let mut file = file;
                 match file.read_to_string(&mut body) {
-                    Ok(_) => response::ok(body, true),
-                    Err(_) => response::internal_server_error(),
+                    Ok(_) => HttpResponse::ok(body, true),
+                    Err(_) => HttpResponse::internal_server_error(),
                 }
             },
             Err(_) => {
-                response::not_found()
+                HttpResponse::not_found()
             },
         }
     }
 
-    fn post_operation(&self, path: &String, req: &request::HttpRequest, status: &mut WebServerStatus) -> HttpResponse {
+    fn post_operation(&self, path: &String, req: &HttpRequest, status: &mut WebServerStatus) -> HttpResponse {
         info!("post_operation begin");
 
         let path_fragments: Vec<&str> = path.split('/').collect();
         let path_type = path_fragments[1];
         if path_fragments.len() < 3 {
-            response::not_found()
+            HttpResponse::not_found()
         } else {
             let path: String = path_fragments.into_iter().skip(2).collect();
             match path_type {
                 "html" => self.get_operation_html(&path),
                 "ssr" => ssr::dispatch_ssr(&path, &req, status),
-                _ => response::not_found(),
+                _ => HttpResponse::not_found(),
             }
         }
     }
@@ -91,12 +89,12 @@ impl Dispatcher {
                 let mut body = String::new();
                 let mut file = file;
                 match file.read_to_string(&mut body) {
-                    Ok(_) => response::ok(body, false),
-                    Err(_) => response::internal_server_error(),
+                    Ok(_) => HttpResponse::ok(body, false),
+                    Err(_) => HttpResponse::internal_server_error(),
                 }
             },
             Err(_) => {
-                response::not_found()
+                HttpResponse::not_found()
             },
         }
     }

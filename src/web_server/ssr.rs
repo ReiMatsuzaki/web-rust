@@ -1,9 +1,10 @@
-use crate::response::{self, HttpResponse};
 use crate::request;
 use log::{info, error};
 use std::fmt;
 use base64::{decode, DecodeError};
-use crate::web_server::WebServerStatus;
+use crate::request::http_request::HttpRequest;
+use crate::response::http_response::HttpResponse;
+use crate::web_server::web_server::WebServerStatus;
 
 #[derive(Debug)]
 pub enum SsrError {
@@ -23,7 +24,7 @@ impl fmt::Display for SsrError {
 }
 
 pub fn dispatch_ssr(path: &String,
-                    req: &request::HttpRequest,
+                    req: &HttpRequest,
                     status: &mut WebServerStatus) -> HttpResponse {
     info!("dispatch_str begin");
     let result = match path.as_str() {
@@ -33,20 +34,20 @@ pub fn dispatch_ssr(path: &String,
         "31_004" => ssr_31_004(&req.body),
         "31_010" => ssr_31_010(req),
         "31_011" => ssr_31_011(req, status),
-        _ => Ok(response::not_found()),
+        _ => Ok(HttpResponse::not_found()),
     };
     match result {
         Ok(x) => x,
         Err(e) => {
             error!("{}", e);
-            response::internal_server_error()
+            HttpResponse::internal_server_error()
         }
     }
 }
 
 fn ssr_page1(path: &String) -> Result<HttpResponse, SsrError> {
     let body = format!("<p>this is SSR sample</p><p>path: {}</p>", path);
-    Ok(response::ok(body, true))
+    Ok(HttpResponse::ok(body, true))
 }
 
 fn ssr_31_002() -> Result<HttpResponse, SsrError> {
@@ -65,10 +66,10 @@ fn ssr_31_002() -> Result<HttpResponse, SsrError> {
     </html>
     "#;
     let body = format!("{}", body);
-    Ok(response::ok(body, true))
+    Ok(HttpResponse::ok(body, true))
 }
 
-fn ssr_31_003(req_body: &request::Body) -> Result<HttpResponse, SsrError> {
+fn ssr_31_003(req_body: &request::body::Body) -> Result<HttpResponse, SsrError> {
     info!("ssr_31_003 begin");
     let name = match req_body.get("name") {
         Some(x) => x,
@@ -98,10 +99,10 @@ fn ssr_31_003(req_body: &request::Body) -> Result<HttpResponse, SsrError> {
     </body>
     </html>
     "#, name, mail, gender, name, mail, gender);
-    Ok(response::ok(body, true))
+    Ok(HttpResponse::ok(body, true))
 }
 
-fn ssr_31_004(req_body: &request::Body) -> Result<HttpResponse, SsrError> {
+fn ssr_31_004(req_body: &request::body::Body) -> Result<HttpResponse, SsrError> {
     info!("ssr_31_004 begin");
     let name = match req_body.get("name") {
         Some(x) => x,
@@ -126,14 +127,14 @@ fn ssr_31_004(req_body: &request::Body) -> Result<HttpResponse, SsrError> {
     </body>
     </html>
     "#, name, mail, gender);
-    Ok(response::ok(body, true))
+    Ok(HttpResponse::ok(body, true))
 }
 
-fn ssr_31_010(req: &request::HttpRequest) -> Result<HttpResponse, SsrError> {
+fn ssr_31_010(req: &HttpRequest) -> Result<HttpResponse, SsrError> {
     let header = &req.header;
     let line = header.get("Authorization");
     match line {
-        None => Ok(response::unauthorized()),
+        None => Ok(HttpResponse::unauthorized()),
         Some(line) => {
             let mut xs = line.trim().split_whitespace();
             let x0 = xs.next().unwrap().trim();
@@ -148,7 +149,7 @@ fn ssr_31_010(req: &request::HttpRequest) -> Result<HttpResponse, SsrError> {
                         if decoded == "aa:bb" {
                             Ok(ssr_31_010_page())
                         } else {
-                            Ok(response::unauthorized())
+                            Ok(HttpResponse::unauthorized())
                         }
                     }
                 }
@@ -166,28 +167,28 @@ fn ssr_31_010_page() -> HttpResponse {
     </body>
     </html>
     ");
-    response::ok(body, true)
+    HttpResponse::ok(body, true)
 }
 
-fn ssr_31_011(_: &request::HttpRequest, _: &mut WebServerStatus) -> Result<HttpResponse, SsrError> {
-    Ok(response::not_found())
+fn ssr_31_011(_: &HttpRequest, _: &mut WebServerStatus) -> Result<HttpResponse, SsrError> {
+    Ok(HttpResponse::not_found())
 }
 
 #[test]
 fn ssr_test() {
     use base64::encode;
 
-    fn get_req(name_pass: &str) -> request::HttpRequest {
+    fn get_req(name_pass: &str) -> HttpRequest {
         let value = format!("method {}", encode(name_pass));
 
-        let lead_line = request::LeadLine::get("path".to_string());
-        let mut header = request::Header::new();
+        let lead_line = request::lead_line::LeadLine::get("path".to_string());
+        let mut header = request::header::Header::new();
         header.insert("Authorization".to_string(), value);
         let header = header;
 
-        let body = request::Body::new();
+        let body = request::body::Body::new();
 
-        request::HttpRequest { lead_line, header, body }
+        HttpRequest { lead_line, header, body }
     }
 
     let req = get_req("aa:bb");

@@ -1,7 +1,7 @@
-use crate::dispatcher::Dispatcher;
-use crate::request;
-use crate::response;
 use std::collections::HashMap;
+use crate::request::http_request::HttpRequest;
+use crate::response::http_response::HttpResponse;
+use crate::web_server::dispatcher::Dispatcher;
 
 pub struct WebServerStatus {
     key_value: HashMap<String, String>,
@@ -10,6 +10,9 @@ impl WebServerStatus {
     pub fn new() -> WebServerStatus {
         let key_value: HashMap<String, String> = HashMap::new();
         WebServerStatus{key_value}
+    }
+    pub fn insert(&mut self, k: String, v: String) {
+        self.key_value.insert(k, v);
     }
 }
 
@@ -23,7 +26,7 @@ impl WebServer {
         let status = WebServerStatus::new();
         WebServer{dispatcher, status}
     }
-    pub fn response(&mut self, req: &request::HttpRequest) -> response::HttpResponse {
+    pub fn response(&mut self, req: &HttpRequest) -> HttpResponse {
         self.dispatcher.dispatch(req, &mut self.status)
     }
 }
